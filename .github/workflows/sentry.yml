@@ -1,34 +1,40 @@
-name: Track Everything
+name: Update & Deploy
 
 on:
   schedule:
-    - cron: '0 11 * * *' # Runs daily at 11:00 UTC
-  workflow_dispatch:      # Allows manual click
+    - cron: '0 10 * * *' # Every day at 10am
+  workflow_dispatch:
 
 jobs:
-  surveillance:
+  build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      
+      contents: write # Needed to save the images
+
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Set up Python
+
+      # 1. Run Python Backend
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-          
-      - name: Install dependencies
-        run: pip install requests pillow
-        
-      - name: Run Scan
-        run: python sentry.py
-        
-      - name: Commit Intelligence
+      - run: pip install requests
+      - run: python backend/generate_data.py
+
+      # 2. Commit New Images (So they are in the repo)
+      - name: Commit Data
         run: |
-          git config --global user.name "Sentry Bot"
-          git config --global user.email "bot@nasa.gov"
-          git add *.png README.md
-          # Only commit if we found something new
-          git diff --quiet && git diff --staged --quiet || (git commit -m "👁️ Daily Earth Scan Logged" && git push)
+          git config --global user.name "Satellite Bot"
+          git config --global user.email "bot@orbital.com"
+          git add public/images/* public/satellite_data.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "🛰️ Daily Satellite Sync" && git push)
+
+      # 3. Build & Deploy to Vercel (Optional: Or use GitHub Pages)
+      # If using Vercel, Vercel will auto-detect the commit from Step 2 and rebuild automatically.
+      # If using GitHub Pages (Simpler/Free):
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build # Or ./out if using Next.js export
