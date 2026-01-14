@@ -1,0 +1,4 @@
+[
+  {"id": "lagos", "name": "Lagos, Nigeria", "lat": 6.524, "lon": 3.379, "zoom": 0.1},
+  {"id": "tokyo", "name": "Tokyo, Japan", "lat": 35.676, "lon": 139.650, "zoom": 0.1}
+]
