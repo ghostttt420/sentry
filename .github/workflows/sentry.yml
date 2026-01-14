@@ -1,13 +1,12 @@
-name: Orbital Sentry
+name: Track Everything
 
 on:
   schedule:
-    # NASA updates Night Lights around 10-12 UTC usually
-    - cron: '0 12 * * *' 
-  workflow_dispatch:
+    - cron: '0 11 * * *' # Runs daily at 11:00 UTC
+  workflow_dispatch:      # Allows manual click
 
 jobs:
-  track:
+  surveillance:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -23,13 +22,13 @@ jobs:
       - name: Install dependencies
         run: pip install requests pillow
         
-      - name: Run Sentry
+      - name: Run Scan
         run: python sentry.py
         
-      - name: Update Dashboard (Commit Images)
+      - name: Commit Intelligence
         run: |
           git config --global user.name "Sentry Bot"
           git config --global user.email "bot@nasa.gov"
-          git add README.md latest.png diff_map.png reference.png
-          # Only commit if things changed
-          git diff --quiet && git diff --staged --quiet || (git commit -m "🛰️ Update Daily Scan" && git push)
+          git add *.png README.md
+          # Only commit if we found something new
+          git diff --quiet && git diff --staged --quiet || (git commit -m "👁️ Daily Earth Scan Logged" && git push)
