@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Parse Data & Update Database
+           - name: Parse Data & Update Database
         run: |
           # 1. Determine Source (Manual Input vs Issue Body)
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
@@ -44,8 +44,6 @@ jobs:
               "lon": ${{ github.event.inputs.lon }},
               "zoom": 0.1
             }' > new_target.json
-            
-            # Sanitize ID in python later
             
           else
             # Get JSON from Issue Body
@@ -82,7 +80,9 @@ jobs:
           # Avoid duplicates
           if not any(t['id'] == new_entry['id'] for t in targets):
               targets.append(new_entry)
-              print(f'Added {new_entry[\'name\']}')
+              # FIXED LINE BELOW: accessing variable outside f-string
+              name = new_entry['name']
+              print(f'Added {name}')
           else:
               print('Target already exists.')
               
@@ -91,6 +91,7 @@ jobs:
           "
           
           rm new_target.json
+
 
       - name: Commit Changes
         run: |
