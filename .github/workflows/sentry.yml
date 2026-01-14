@@ -3,44 +3,93 @@ name: Process New Target
 on:
   issues:
     types: [opened]
+  # Enables the "Run Workflow" button manually
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Target Name (e.g. Area 51)'
+        required: true
+      lat:
+        description: 'Latitude'
+        required: true
+      lon:
+        description: 'Longitude'
+        required: true
 
 jobs:
   add-target:
-    if: contains(github.event.issue.title, 'ADD_TARGET')
+    # Run if it's a manual dispatch OR if it's an issue with the correct title
+    if: >
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'issues' && contains(github.event.issue.title, 'ADD_TARGET'))
+    
     runs-on: ubuntu-latest
     permissions:
       contents: write
       issues: write
+      actions: write
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Parse Issue & Update Database
-        id: update
+      - name: Parse Data & Update Database
         run: |
-          # 1. Get the JSON body from the issue
-          echo "${{ github.event.issue.body }}" > new_target.json
-          
-          # 2. Use Python to append it to targets.json
+          # 1. Determine Source (Manual Input vs Issue Body)
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # Construct JSON manually from inputs
+            echo '{
+              "id": "${{ github.event.inputs.name }}",
+              "name": "${{ github.event.inputs.name }}",
+              "lat": ${{ github.event.inputs.lat }},
+              "lon": ${{ github.event.inputs.lon }},
+              "zoom": 0.1
+            }' > new_target.json
+            
+            # Sanitize ID in python later
+            
+          else
+            # Get JSON from Issue Body
+            echo "${{ github.event.issue.body }}" > new_target.json
+          fi
+
+          # 2. Append to targets.json using Python
           python3 -c "
-          import json, os
+          import json, os, re
+
+          # Load the new entry
           with open('new_target.json', 'r') as f:
-              new_t = json.load(f)
+              raw = json.load(f)
           
+          # Clean up the ID (spaces to underscores, lowercase)
+          clean_id = re.sub(r'[^a-zA-Z0-9_]', '', raw['name'].replace(' ', '_').lower())
+          
+          new_entry = {
+              'id': clean_id,
+              'name': raw['name'],
+              'lat': float(raw['lat']),
+              'lon': float(raw['lon']),
+              'zoom': 0.1
+          }
+
           targets = []
           if os.path.exists('targets.json'):
               with open('targets.json', 'r') as f:
-                  targets = json.load(f)
+                  try:
+                      targets = json.load(f)
+                  except:
+                      targets = []
                   
           # Avoid duplicates
-          if not any(t['id'] == new_t['id'] for t in targets):
-              targets.append(new_t)
+          if not any(t['id'] == new_entry['id'] for t in targets):
+              targets.append(new_entry)
+              print(f'Added {new_entry[\'name\']}')
+          else:
+              print('Target already exists.')
               
           with open('targets.json', 'w') as f:
               json.dump(targets, f, indent=2)
           "
           
-          # 3. Cleanup
           rm new_target.json
 
       - name: Commit Changes
@@ -48,16 +97,16 @@ jobs:
           git config --global user.name "Command Bot"
           git config --global user.email "bot@satellite.com"
           git add targets.json
-          git commit -m "🎯 New Target Acquired: ${{ github.event.issue.title }}"
-          git push
+          # Only commit if file changed
+          git diff --quiet && git diff --staged --quiet || (git commit -m "🎯 New Target Acquired" && git push)
 
-      - name: Trigger Scan
-        # This triggers the main deploy workflow to run IMMEDIATELY
+      - name: Trigger Scan (Deploy)
         run: gh workflow run deploy.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Close Issue
+      - name: Close Issue (If Applicable)
+        if: github.event_name == 'issues'
         run: gh issue close ${{ github.event.issue.number }} --comment "✅ Target Acquired. Satellite tasking initiated."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
