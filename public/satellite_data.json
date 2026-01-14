@@ -1,0 +1,26 @@
+{
+  "last_updated": "2026-01-14",
+  "locations": [
+    {
+      "id": "lagos",
+      "name": "Lagos, Nigeria",
+      "coordinates": "6.524, 3.379",
+      "image_url": "/images/lagos_2026-01-14.jpg",
+      "status": "Active"
+    },
+    {
+      "id": "tokyo",
+      "name": "Tokyo, Japan",
+      "coordinates": "35.676, 139.65",
+      "image_url": "/images/tokyo_2026-01-14.jpg",
+      "status": "Active"
+    },
+    {
+      "id": "delta",
+      "name": "Niger Delta (Flares)",
+      "coordinates": "4.5, 7.0",
+      "image_url": "/images/delta_2026-01-14.jpg",
+      "status": "Active"
+    }
+  ]
+}
