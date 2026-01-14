@@ -1,40 +1,63 @@
-name: Update & Deploy
+name: Process New Target
 
 on:
-  schedule:
-    - cron: '0 10 * * *' # Every day at 10am
-  workflow_dispatch:
+  issues:
+    types: [opened]
 
 jobs:
-  build-and-deploy:
+  add-target:
+    if: contains(github.event.issue.title, 'ADD_TARGET')
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Needed to save the images
+      contents: write
+      issues: write
 
     steps:
       - uses: actions/checkout@v3
 
-      # 1. Run Python Backend
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      - run: pip install requests
-      - run: python backend/generate_data.py
-
-      # 2. Commit New Images (So they are in the repo)
-      - name: Commit Data
+      - name: Parse Issue & Update Database
+        id: update
         run: |
-          git config --global user.name "Satellite Bot"
-          git config --global user.email "bot@orbital.com"
-          git add public/images/* public/satellite_data.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "🛰️ Daily Satellite Sync" && git push)
+          # 1. Get the JSON body from the issue
+          echo "${{ github.event.issue.body }}" > new_target.json
+          
+          # 2. Use Python to append it to targets.json
+          python3 -c "
+          import json, os
+          with open('new_target.json', 'r') as f:
+              new_t = json.load(f)
+          
+          targets = []
+          if os.path.exists('targets.json'):
+              with open('targets.json', 'r') as f:
+                  targets = json.load(f)
+                  
+          # Avoid duplicates
+          if not any(t['id'] == new_t['id'] for t in targets):
+              targets.append(new_t)
+              
+          with open('targets.json', 'w') as f:
+              json.dump(targets, f, indent=2)
+          "
+          
+          # 3. Cleanup
+          rm new_target.json
 
-      # 3. Build & Deploy to Vercel (Optional: Or use GitHub Pages)
-      # If using Vercel, Vercel will auto-detect the commit from Step 2 and rebuild automatically.
-      # If using GitHub Pages (Simpler/Free):
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build # Or ./out if using Next.js export
+      - name: Commit Changes
+        run: |
+          git config --global user.name "Command Bot"
+          git config --global user.email "bot@satellite.com"
+          git add targets.json
+          git commit -m "🎯 New Target Acquired: ${{ github.event.issue.title }}"
+          git push
+
+      - name: Trigger Scan
+        # This triggers the main deploy workflow to run IMMEDIATELY
+        run: gh workflow run deploy.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Close Issue
+        run: gh issue close ${{ github.event.issue.number }} --comment "✅ Target Acquired. Satellite tasking initiated."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
